@@ -1,8 +1,10 @@
 # CLAUDE.md — Panel de contenido
 
-Panel de control para la gestión de contenido de EDMA Connect. Por ahora es solo
-el esqueleto: cinco secciones con páginas de marcador de posición y una barra
-lateral compartida. Todo el texto visible está en español.
+Panel de control para la gestión de contenido de EDMA Connect: cinco secciones
+con una barra lateral compartida. El **Administrador de Instagram** ya funciona
+(publicaciones programadas, borradores, ideas, publicadas y registro de
+pendientes); las otras cuatro son páginas de marcador de posición. Todo el texto
+visible está en español.
 
 ## Pila tecnológica
 
@@ -13,7 +15,7 @@ lateral compartida. Todo el texto visible está en español.
 | TypeScript | 5, modo `strict` | alias `@/*` → `src/*` |
 | Tailwind CSS | 4 | configuración en CSS (`@theme` en `globals.css`), sin `tailwind.config` |
 | shadcn/ui | estilo `new-york`, color base `neutral` | ver `components.json` |
-| Radix UI | `react-slot`, `react-separator`, `react-dialog` | primitivas usadas por shadcn |
+| Radix UI | `react-slot`, `react-separator`, `react-dialog`, `react-label`, `react-select`, `react-tabs` | primitivas usadas por shadcn |
 | lucide-react | | iconos |
 | tw-animate-css | | animaciones de shadcn (Sheet) |
 | geist | | fuentes Geist Sans/Mono servidas desde npm |
@@ -32,13 +34,20 @@ panel/
 │   │   ├── globals.css        # Tailwind + variables de color de shadcn (claro y oscuro)
 │   │   ├── layout.tsx         # layout raíz: tema oscuro, barra lateral, menú móvil
 │   │   ├── page.tsx           # portada: tarjetas que enlazan a cada sección
-│   │   ├── instagram/page.tsx     # Administrador de Instagram
+│   │   ├── instagram/page.tsx     # Administrador de Instagram (funcional)
 │   │   ├── analisis/page.tsx      # Análisis
 │   │   ├── calendario/page.tsx    # Calendario de contenido
 │   │   ├── competencia/page.tsx   # Seguimiento de la competencia
 │   │   └── noticias/page.tsx      # Consolidador de noticias
 │   ├── components/
 │   │   ├── ui/                # componentes de shadcn/ui
+│   │   ├── instagram/         # gestor de Instagram
+│   │   │   ├── instagram-manager.tsx  # contenedor: resumen, pestañas, diálogo
+│   │   │   ├── post-card.tsx          # tarjeta de publicación con acciones
+│   │   │   ├── post-form-dialog.tsx   # crear/editar (título, caption, tipo, estado, fecha)
+│   │   │   ├── pending-log.tsx        # registro de pendientes en lista
+│   │   │   ├── stats-cards.tsx        # tarjetas de resumen con contadores
+│   │   │   └── post-badges.tsx        # etiquetas de tipo y estado
 │   │   └── layout/            # piezas propias del armazón del panel
 │   │       ├── app-sidebar.tsx         # barra lateral fija (md+)
 │   │       ├── mobile-nav.tsx          # cabecera + Sheet con el menú (< md)
@@ -49,7 +58,11 @@ panel/
 │   ├── config/
 │   │   └── nav.ts             # ÚNICA lista de secciones (título, ruta, icono, descripción)
 │   └── lib/
-│       └── utils.ts           # cn() = clsx + tailwind-merge
+│       ├── utils.ts           # cn() = clsx + tailwind-merge
+│       └── instagram/
+│           ├── types.ts       # Post, tipos, estados, etiquetas y formato de fechas
+│           ├── seed.ts        # datos de ejemplo (plan de la semana 1)
+│           └── use-posts.ts   # hook de estado guardado en localStorage
 ```
 
 ## Convenciones de componentes
@@ -71,7 +84,8 @@ panel/
 - **Estilos:** solo clases de Tailwind con los tokens semánticos de shadcn
   (`bg-background`, `text-muted-foreground`, `bg-sidebar`, `border`…), nunca
   colores fijos como `bg-zinc-900`, para que el tema se controle desde
-  `globals.css`. Las clases se combinan con `cn()`.
+  `globals.css`. Las clases se combinan con `cn()`. Para estados hay tres tokens
+  propios: `info` (programada), `success` (publicada) y `warning` (idea, atrasada).
 - **Componentes como funciones con nombre** y exportación nombrada; las páginas
   usan `export default`. Archivos en `kebab-case.tsx`.
 - **Páginas de marcador de posición:** usan `<SectionPlaceholder href="/ruta"
@@ -89,9 +103,9 @@ panel/
 3. **shadcn/ui instalado a mano:** el entorno donde se creó el proyecto no podía
    acceder a `ui.shadcn.com`, así que `npx shadcn init/add` falló. Se creó
    `components.json` y se escribieron los componentes (`button`, `card`, `badge`,
-   `separator`, `sheet`) con el código del estilo `new-york` para Tailwind 4. Desde
+   `separator`, `sheet`, `dialog`, `input`, `textarea`, `label`, `select`, `tabs`) con el código del estilo `new-york` para Tailwind 4. Desde
    un equipo con internet normal, `npx shadcn@latest add <componente>` funciona
-   sobre esta configuración (puede pedir sobrescribir esos cinco; es seguro).
+   sobre esta configuración (puede pedir sobrescribirlos; es seguro).
 4. **Barra lateral propia y sencilla** en lugar del componente `Sidebar` de
    shadcn (que es grande y trae colapsado, cookies y atajos). Usa los mismos
    tokens `--sidebar-*`, así que se puede cambiar por el oficial más adelante sin
@@ -99,6 +113,24 @@ panel/
 5. **Fuentes desde el paquete `geist`** en vez de `next/font/google`, para que la
    compilación no dependa de descargar de Google Fonts.
 6. **Next.js 15 con Webpack** (sin `--turbopack`) para una compilación estable.
-7. **Todas las páginas son estáticas** por ahora: no hay base de datos, API ni
-   autenticación. Esas decisiones quedan pendientes para cuando cada sección
-   tenga funcionalidad real.
+7. **Sin backend por ahora:** no hay base de datos, API ni autenticación.
+
+## Administrador de Instagram
+
+- **Modelo** (`lib/instagram/types.ts`): cada `Post` tiene título, subtítulo
+  (caption, máx. 2200 caracteres como en Instagram), tipo (`reel`, `carrusel`,
+  `foto`, `historia`), estado y `scheduledAt` en hora local `YYYY-MM-DDTHH:mm`.
+- **Flujo de estados:** `idea → borrador → programada → publicada`. Cada tarjeta
+  muestra un botón con el siguiente paso; programar sin fecha abre el editor.
+  Una publicación programada no puede guardarse sin fecha; si se marca publicada
+  sin fecha, toma la hora actual.
+- **Pestañas:** Programadas (por fecha ascendente), Borradores, Ideas, Publicadas
+  (más reciente primero) y Pendientes (todo lo no publicado, con aviso de
+  «atrasada» si la fecha ya pasó).
+- **Guardado en el navegador** (`localStorage`, clave `edma.instagram.posts.v1`).
+  La primera vez carga `seed.ts`. Los datos no se comparten entre equipos ni se
+  publican en Instagram: esto es un tablero de planificación. Cuando haga falta
+  compartir o publicar, se sustituye `use-posts.ts` por una API sin tocar los
+  componentes (mantienen la misma interfaz `posts/addPost/updatePost/deletePost`).
+- `posts` es `null` hasta leer `localStorage`, y mientras tanto se muestra un
+  esqueleto: así el HTML del servidor y el del cliente coinciden.

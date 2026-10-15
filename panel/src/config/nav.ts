@@ -24,7 +24,7 @@ export const navItems: NavItem[] = [
     title: "Administrador de Instagram",
     href: "/instagram",
     icon: Camera,
-    description: "Publicaciones, borradores, comentarios y mensajes de la cuenta.",
+    description: "Publicaciones programadas, borradores, publicadas e ideas nuevas.",
   },
   {
     title: "Análisis",

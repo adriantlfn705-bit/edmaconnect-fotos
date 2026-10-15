@@ -1,14 +1,14 @@
-import { SectionPlaceholder } from "@/components/layout/section-placeholder";
+import { InstagramManager } from "@/components/instagram/instagram-manager";
+import { PageHeader } from "@/components/layout/page-header";
+import { getNavItem } from "@/config/nav";
 
 export default function InstagramPage() {
+  const item = getNavItem("/instagram");
+
   return (
-    <SectionPlaceholder
-      href="/instagram"
-      upcoming={[
-        "Vista de la cuadrícula del perfil",
-        "Borradores y publicaciones programadas",
-        "Bandeja de comentarios y mensajes directos",
-      ]}
-    />
+    <div className="space-y-6">
+      <PageHeader title={item.title} description={item.description} icon={item.icon} />
+      <InstagramManager />
+    </div>
   );
 }
